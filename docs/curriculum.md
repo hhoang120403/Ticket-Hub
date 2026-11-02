@@ -44,6 +44,7 @@
 - [Phase 7 — Microservices](#phase-7--microservices)
 - [Phase 8 — DevOps & Observability](#phase-8--devops--observability)
 - [Phase 9 — Tối ưu, System Design & Portfolio](#phase-9--tối-ưu-system-design--portfolio)
+- [Module tùy chọn A, B, C](#module-tùy-chọn)
 
 ---
 
@@ -112,6 +113,7 @@ Học theo thứ tự: types cơ bản → narrowing → generics → utility ty
 - 🏋️ Bài tập:
   1. Chạy Postgres bằng `docker run`, kết nối bằng `psql`, rồi xóa container: dữ liệu mất. Thêm volume và làm lại: dữ liệu còn.
   2. Viết `docker-compose.yml` gồm Postgres, Redis, Adminer. Vào Adminer xem DB.
+  3. Thêm **RustFS** (S3-compatible storage) vào compose, mở console của nó, tạo bucket và upload thử một file. Docs: https://docs.rustfs.com
 - 🎫 `docker-compose.yml` của TicketHub.
 
 ### 0.6 SQL & PostgreSQL cơ bản — 🟡 Dùng được
@@ -122,6 +124,7 @@ Học theo thứ tự: types cơ bản → narrowing → generics → utility ty
 - 🏋️ Bài tập:
   1. Tạo 3 bảng `users`, `events`, `orders`, insert dữ liệu mẫu, viết 10 query: JOIN, GROUP BY, HAVING, subquery, window function (`ROW_NUMBER`).
   2. Insert 100k dòng bằng `generate_series`, chạy `EXPLAIN ANALYZE` trước và sau khi thêm index.
+  3. Tạo cột `metadata jsonb`, lưu vài object có cấu trúc khác nhau, truy vấn bằng `->`, `->>`, `@>`. Docs: https://www.postgresql.org/docs/current/datatype-json.html
 - 🎫 Vẽ ERD TicketHub.
 
 ### 0.7 Monorepo & công cụ chất lượng code — 🟡 Dùng được
@@ -142,6 +145,14 @@ Học theo thứ tự: types cơ bản → narrowing → generics → utility ty
 - 🎬 https://www.youtube.com/results?search_query=database+design+course+normalization
 - 🏋️ Bài tập: vẽ ERD cho một thư viện sách (Book, Author, Member, Loan), xác định quan hệ 1-n, n-n, unique và index.
 - 🎫 ERD TicketHub (roadmap mục 2.3).
+
+### 0.9 SQL vs NoSQL — 🟢 Biết
+- 📄 MongoDB – Data modeling (để hiểu tư duy document): https://www.mongodb.com/docs/manual/data-modeling/
+- 📄 Redis – các kiểu dữ liệu (Redis cũng là NoSQL): https://redis.io/docs/latest/develop/data-types/
+- 📄 *Designing Data-Intensive Applications*, chương 2 (Data Models and Query Languages)
+- 🎬 https://www.youtube.com/results?search_query=sql+vs+nosql+when+to+use
+- 🏋️ Bài tập: viết bảng so sánh 4 nhóm NoSQL (key-value, document, wide-column, graph), mỗi nhóm một ví dụ sản phẩm và một use case. Sau đó trả lời: *dữ liệu nào của TicketHub hợp Postgres, dữ liệu nào hợp Redis, và có chỗ nào thật sự cần document DB không?*
+- 🎫 Roadmap mục 3.7: Postgres là DB chính, Redis cho cache/seat hold/queue, MongoDB chỉ là module tùy chọn.
 
 ---
 
@@ -186,8 +197,14 @@ Học theo thứ tự: types cơ bản → narrowing → generics → utility ty
 - 📄 https://docs.nestjs.com/techniques/configuration
 - 📄 https://docs.nestjs.com/techniques/logger
 - 📄 nestjs-pino: https://github.com/iamolegga/nestjs-pino
+- 📄 Pino redaction (che dữ liệu nhạy cảm trong log): https://getpino.io/#/docs/redaction
+- 📄 OWASP Logging Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 - 📄 The Twelve-Factor App, mục III. Config: https://12factor.net/config
-- 🏋️ Bài tập: validate env bằng Zod hoặc Joi. Thiếu `DATABASE_URL` thì app phải **crash ngay khi khởi động** với thông báo rõ ràng. Thêm correlation id vào mọi dòng log.
+- 🏋️ Bài tập:
+  1. Validate env bằng Zod hoặc Joi. Thiếu `DATABASE_URL` thì app phải **crash ngay khi khởi động** với thông báo rõ ràng.
+  2. Thêm correlation id vào mọi dòng log (lấy từ header `x-request-id` nếu có, không thì tự sinh).
+  3. Cấu hình `redact` cho `req.headers.authorization`, `req.headers.cookie`, `*.password`, `*.token`. Gửi request login và chứng minh log không lộ mật khẩu.
+  4. Đặt mức log theo môi trường: `debug` ở local, `info` ở production; local dùng `pino-pretty` cho dễ đọc.
 - 🎫 `config/` của TicketHub.
 
 ### 1.5 MikroORM — Khái niệm cốt lõi — 🔴 Hiểu sâu ⭐ (quan trọng nhất phase)
@@ -247,7 +264,9 @@ Học theo thứ tự: EntityManager → Unit of Work → Identity Map → Reque
 
 ### 1.10 Health check — 🟢 Biết
 - 📄 https://docs.nestjs.com/recipes/terminus
-- 🎫 `/health` của TicketHub.
+- 📄 Liveness vs readiness (khái niệm từ Kubernetes, áp dụng được cho mọi nơi): https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+- 🏋️ Bài tập: tách `/health/live` (process còn sống) và `/health/ready` (kết nối được DB, Redis). Tắt Redis và xem endpoint nào đổi trạng thái.
+- 🎫 `/health/live`, `/health/ready` của TicketHub; sau này Uptime Kuma (Phase 8) sẽ ping `/health/ready`.
 
 ---
 
@@ -379,10 +398,18 @@ Học theo thứ tự: EntityManager → Unit of Work → Identity Map → Reque
 - 🏋️ Bài tập: bảo vệ route `/dashboard`, tự động gọi refresh khi nhận 401 rồi retry request ban đầu đúng 1 lần.
 - 🎫 Tích hợp auth TicketHub.
 
-### 3.11 Upload file với presigned URL — 🟢 Biết
+### 3.11 Upload file với presigned URL lên S3-compatible storage — 🟡 Dùng được
 - 📄 AWS S3 presigned URL: https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html
-- 📄 MinIO (S3 chạy local): https://min.io/docs/minio/container/index.html
-- 🎫 Upload ảnh sự kiện.
+- 📄 AWS SDK for JavaScript v3, S3 client: https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/
+- 📄 `@aws-sdk/s3-request-presigner`: https://www.npmjs.com/package/@aws-sdk/s3-request-presigner
+- 📄 CORS cho bucket: https://docs.aws.amazon.com/AmazonS3/latest/userguide/cors.html
+- 📄 RustFS (S3-compatible, chạy local): https://docs.rustfs.com · https://github.com/rustfs/rustfs
+- ⚠️ Không dùng MinIO cho dự án mới: bản Community Edition đã vào chế độ bảo trì từ 12/2025.
+- 🏋️ Bài tập:
+  1. Tạo `S3Client` đọc `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE`, access key, secret key từ env. Local trỏ tới RustFS (`forcePathStyle: true`).
+  2. Endpoint `POST /uploads/presign` trả về presigned PUT URL (hết hạn 5 phút, giới hạn `Content-Type` là ảnh). Trình duyệt upload thẳng lên storage bằng URL đó.
+  3. **Gặp lỗi có chủ đích:** API gọi storage qua `http://rustfs:9000` (tên container), nhưng trình duyệt không mở được URL ký bằng tên đó. Sửa bằng cách ký URL với endpoint public (`S3_PUBLIC_ENDPOINT`). Sau đó gặp lỗi CORS và cấu hình CORS cho bucket.
+- 🎫 Upload ảnh sự kiện. Phase 8 chỉ đổi biến môi trường để chạy trên AWS S3.
 
 ---
 
@@ -407,7 +434,7 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
   - **State:** đèn giao thông, hoặc trạng thái đơn hàng với các chuyển trạng thái hợp lệ.
   - **Observer:** event bus mini với `on`, `emit`, `off`.
   - **Specification:** `isAdult.and(hasVerifiedEmail).or(isAdmin)`.
-- 🎫 Coupon (Strategy, Specification), Payment (Adapter, Factory), Order (State).
+- 🎫 Coupon (Strategy, Specification), Payment (Adapter, Factory), Order (State), Storage (port `FileStorage` + adapter `S3FileStorage`).
 
 ### 4.3 Layered, Clean & Hexagonal Architecture — 🔴 Hiểu sâu
 - 📄 Uncle Bob – The Clean Architecture: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
@@ -518,6 +545,23 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
 - 🏋️ Bài tập: cache-aside cho API danh sách, invalidate khi có update. Đo latency trước và sau.
 - 🎫 Cache danh sách sự kiện.
 
+### 5.10 Observability cho hệ bất đồng bộ: tracing & metrics — 🟡 Dùng được
+Học theo thứ tự: 3 trụ cột (log, metric, trace) → OpenTelemetry → Prometheus metric → metric nghiệp vụ.
+- 📄 OpenTelemetry concepts (signals, trace, span, context propagation): https://opentelemetry.io/docs/concepts/
+- 📄 OpenTelemetry Node.js: https://opentelemetry.io/docs/languages/js/getting-started/nodejs/
+- 📄 `grafana/otel-lgtm` (Grafana + Loki + Tempo + Prometheus + OTel collector trong một container): https://github.com/grafana/docker-otel-lgtm
+- 📄 prom-client: https://github.com/siimon/prom-client · NestJS: https://github.com/willsoto/nestjs-prometheus
+- 📄 Prometheus – các loại metric (counter, gauge, histogram): https://prometheus.io/docs/concepts/metric_types/
+- 📄 BullMQ – mục Metrics trong https://docs.bullmq.io
+- 🎬 https://www.youtube.com/results?search_query=opentelemetry+explained
+- 🎬 https://www.youtube.com/results?search_query=logs+metrics+traces+observability+explained
+- 🏋️ Bài tập:
+  1. Chạy `grafana/otel-lgtm` bằng Docker, gắn auto-instrumentation cho app Nest playground, gọi vài request và tìm trace trong Grafana (Tempo).
+  2. Cho trace đi xuyên qua queue: truyền trace context vào data của job BullMQ, để thấy span của worker nằm cùng trace với request gốc.
+  3. Expose `/metrics`, tạo 1 counter, 1 gauge, 1 histogram. Giải thích vì sao latency phải dùng histogram chứ không dùng trung bình.
+  4. Viết danh sách metric nghiệp vụ cho TicketHub và với mỗi metric, ghi rõ ngưỡng nào thì cần alert.
+- 🎫 Trace `POST /orders` → job gửi email; metric `tickets_sold_total`, `optimistic_lock_conflicts_total`, `outbox_pending`, `tickets_oversold_total` (luôn bằng 0).
+
 ---
 
 ## Phase 6 — Testing
@@ -591,7 +635,7 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
 - 🎬 https://www.youtube.com/results?search_query=rabbitmq+vs+kafka
 - 🎬 https://www.youtube.com/results?search_query=nestjs+microservices+tutorial
 - 🏋️ Bài tập: 2 service Nest, trong đó `orders` phát event `OrderCreated` và `mailer` lắng nghe. Thử cả request–response (`@MessagePattern`) và event (`@EventPattern`). Tắt `mailer` khi đang phát event để xem chuyện gì xảy ra với từng broker.
-- 🎫 Notification Service.
+- 🎫 Notification Service (muốn thử MongoDB cho service này thì xem Module B).
 
 ### 7.4 Saga & eventual consistency — 🔴 Hiểu sâu ⭐
 - 📄 https://microservices.io/patterns/data/saga.html
@@ -655,21 +699,43 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
 - 🎬 https://www.youtube.com/results?search_query=deploy+docker+compose+vps+nginx+ssl
 - 🏋️ Bài tập: deploy app playground lên 1 VPS rẻ với Docker Compose, Nginx và HTTPS.
 
-### 8.4 Database migration an toàn khi deploy — 🔴 Hiểu sâu
+### 8.4 AWS cơ bản: IAM, S3, chi phí — 🟡 Dùng được
+- 📄 IAM best practices (quyền tối thiểu): https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+- 📄 S3 user guide: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
+- 📄 AWS Budgets (đặt cảnh báo chi phí **trước tiên**): https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html
+- 📄 RDS là gì: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html
+- 🎬 https://www.youtube.com/results?search_query=aws+s3+iam+tutorial+for+beginners
+- 🏋️ Bài tập:
+  1. Tạo tài khoản AWS free tier, bật MFA cho root, đặt budget alert 5 USD.
+  2. Tạo bucket S3 và một IAM user chỉ có quyền `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` trên đúng bucket đó. Cấu hình CORS.
+  3. Đổi biến môi trường của app playground từ RustFS sang S3: bỏ `S3_ENDPOINT`, tắt `forcePathStyle`. Chạy lại bài 3.11 **không sửa dòng code nào**.
+- 🎫 Chuyển storage của TicketHub sang AWS S3; viết ADR về việc tự chạy Postgres hay dùng RDS.
+
+### 8.5 Database migration an toàn khi deploy — 🔴 Hiểu sâu
 - 📄 Expand–Contract (Parallel Change): https://martinfowler.com/bliki/ParallelChange.html
 - 📄 https://www.postgresql.org/docs/current/backup.html
 - 🏋️ Bài tập: đổi tên cột `name` thành `title` **không downtime** qua 3 lần deploy. Backup DB rồi restore vào DB mới và kiểm tra.
 
-### 8.5 Observability: log, metric, error tracking, alert — 🟡 Dùng được
+### 8.6 Observability: log, metric, error tracking, alert — 🟡 Dùng được
 - 📄 Sentry Next.js: https://docs.sentry.io/platforms/javascript/guides/nextjs/
 - 📄 Sentry NestJS: https://docs.sentry.io/platforms/javascript/guides/nestjs/
 - 📄 Prometheus: https://prometheus.io/docs/introduction/overview/
 - 📄 Grafana: https://grafana.com/docs/grafana/latest/getting-started/
 - 📄 Google SRE book – Monitoring Distributed Systems (4 golden signals): https://sre.google/sre-book/monitoring-distributed-systems/
+- 📄 Loki: https://grafana.com/docs/loki/latest/ · Grafana Alloy (đẩy log/metric/trace): https://grafana.com/docs/alloy/latest/
+- 📄 Tempo: https://grafana.com/docs/tempo/latest/
+- 📄 Grafana Alerting: https://grafana.com/docs/grafana/latest/alerting/
+- 📄 Uptime Kuma: https://github.com/louislam/uptime-kuma
 - 🎬 https://www.youtube.com/results?search_query=prometheus+grafana+nodejs
-- 🏋️ Bài tập: expose `/metrics` (prom-client), dựng dashboard 4 golden signals, tạo alert khi error rate > 5%.
+- 🎬 https://www.youtube.com/results?search_query=grafana+loki+tutorial
+- 🏋️ Bài tập:
+  1. Dựng Loki + Prometheus + Tempo + Grafana trên VPS (hoặc dùng gói miễn phí của Grafana Cloud). Log từ container được đẩy vào Loki; từ một dòng log lỗi nhảy được sang trace tương ứng nhờ `traceId`.
+  2. Dashboard 4 golden signals + metric nghiệp vụ từ bài 5.10.
+  3. Alert: error rate > 5%, p95 > 1s, queue tồn > 1000 job, `tickets_oversold_total` > 0. Gửi qua Telegram hoặc email.
+  4. Uptime Kuma ping `/health/ready` mỗi phút; tắt DB và xác nhận nhận được cảnh báo.
+  5. Đặt thời gian lưu log (retention) và ước lượng dung lượng ổ đĩa cần cho 30 ngày.
 
-### 8.6 Kubernetes cơ bản — 🟢 Biết
+### 8.7 Kubernetes cơ bản — 🟢 Biết
 - 📄 https://kubernetes.io/docs/tutorials/kubernetes-basics/
 - 🎬 https://www.youtube.com/results?search_query=techworld+with+nana+kubernetes+tutorial
 - 🏋️ Bài tập (tùy chọn): chạy app playground trên `kind` hoặc `minikube` với Deployment và Service.
@@ -686,26 +752,39 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
 - 🏋️ Bài tập: với 1 triệu bản ghi, so sánh `OFFSET 900000` và cursor pagination bằng `EXPLAIN ANALYZE`.
 - 🎫 Tối ưu API danh sách sự kiện và dashboard.
 
-### 9.2 Tối ưu frontend — 🟡 Dùng được
+### 9.2 Search với PostgreSQL full-text search — 🟡 Dùng được
+- 📄 Full Text Search: https://www.postgresql.org/docs/current/textsearch.html
+- 📄 `unaccent` (bỏ dấu): https://www.postgresql.org/docs/current/unaccent.html
+- 📄 `pg_trgm` (tìm gần đúng, chịu lỗi chính tả): https://www.postgresql.org/docs/current/pgtrgm.html
+- 📄 GIN index: https://www.postgresql.org/docs/current/gin.html
+- 🎬 https://www.youtube.com/results?search_query=postgres+full+text+search+tutorial
+- 🏋️ Bài tập:
+  1. Tạo 100k sự kiện giả có tên tiếng Việt. Đo `ILIKE '%nhac rock%'` bằng `EXPLAIN ANALYZE`.
+  2. Tạo hàm immutable bọc `unaccent` (để dùng được trong index), thêm cột `tsvector` dạng generated column và GIN index. Tìm "nhac rock ha noi" ra "Đêm nhạc Rock Hà Nội".
+  3. Thêm index `gin_trgm_ops` và dùng `similarity()` để "nhạc rok" vẫn ra kết quả. So sánh tốc độ cả ba cách.
+  4. Sắp xếp kết quả theo `ts_rank`, giải thích vì sao kết quả trùng tiêu đề nên xếp trên kết quả trùng mô tả (gợi ý: `setweight`).
+- 🎫 API tìm kiếm sự kiện của TicketHub. Khi nào cần nâng cấp lên search engine riêng: xem Module A.
+
+### 9.3 Tối ưu frontend — 🟡 Dùng được
 - 📄 Core Web Vitals: https://web.dev/articles/vitals
 - 📄 https://web.dev/learn/performance
 - 📄 @next/bundle-analyzer: https://www.npmjs.com/package/@next/bundle-analyzer
 - 🏋️ Bài tập: chạy bundle analyzer cho TicketHub, tìm 3 thứ làm bundle phình và xử lý.
 
-### 9.3 CQRS & read model — 🟡 Dùng được
+### 9.4 CQRS & read model — 🟡 Dùng được
 - 📄 https://martinfowler.com/bliki/CQRS.html
 - 📄 https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs
 - 📄 Materialized view: https://www.postgresql.org/docs/current/rules-materializedviews.html
 - 🎬 https://www.youtube.com/results?search_query=codeopinion+cqrs
 - 🎫 Dashboard doanh thu Organizer.
 
-### 9.4 Tài liệu kiến trúc — 🟡 Dùng được
+### 9.5 Tài liệu kiến trúc — 🟡 Dùng được
 - 📄 C4 model: https://c4model.com
 - 📄 ADR: https://adr.github.io
 - 📄 Mermaid (sequence diagram trong markdown): https://mermaid.js.org
 - 🏋️ Bài tập: vẽ C4 Level 1–3 cho TicketHub và sequence diagram luồng mua vé bằng Mermaid.
 
-### 9.5 System Design — 🟡 Dùng được
+### 9.6 System Design — 🟡 Dùng được
 - 📄 System Design Primer: https://github.com/donnemartin/system-design-primer
 - 📄 ByteByteGo System Design 101: https://github.com/ByteByteGoHq/system-design-101
 - 📄 Sách *Designing Data-Intensive Applications* (đọc lại các chương đã đọc và đọc hết)
@@ -713,7 +792,7 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
 - 🎬 https://www.youtube.com/results?search_query=design+ticketmaster+system+design+interview ⭐ (đúng bài toán của bạn)
 - 🏋️ Bài tập: tự thiết kế "TicketHub cho 1 triệu người cùng giành vé concert" trong 45 phút, rồi so với video ở trên.
 
-### 9.6 Portfolio & phỏng vấn — 🟡 Dùng được
+### 9.7 Portfolio, tiếng Anh & phỏng vấn — 🟡 Dùng được
 - 📄 Viết README tốt: https://www.makeareadme.com
 - 📄 Viblo (blog kỹ thuật tiếng Việt, nơi đăng bài): https://viblo.asia
 - 📄 Câu hỏi phỏng vấn Node/Backend: https://github.com/goldbergyoni/nodebestpractices (đọc như checklist)
@@ -721,6 +800,48 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
   1. Viết 2–3 bài blog từ ADR của bạn.
   2. Ghi âm bản thân trình bày TicketHub trong 5 phút, nghe lại và sửa.
   3. Gõ `phỏng vấn thử` với AI mentor (xem AGENTS.md).
+  4. Đọc 10–20 JD mới nhất trên ITviec/TopDev, cập nhật bảng ở roadmap mục 12.1 và đánh dấu khoảng trống còn lại.
+  5. Trình bày TicketHub 5 phút **bằng tiếng Anh**; README và ADR viết bằng tiếng Anh.
+- 🎫 Roadmap mục 12: thời điểm nộp đơn, CV, 3 câu chuyện kỹ thuật.
+
+---
+
+## Module tùy chọn
+
+Làm khi đã xong phase tương ứng và còn thời gian (roadmap mục 13).
+
+### Module A — Search engine riêng (sau Phase 9.2) — 🟡 Dùng được
+Học theo thứ tự: inverted index → analyzer → mapping → query & relevance → đồng bộ dữ liệu.
+- 📄 Elasticsearch: https://www.elastic.co/docs · OpenSearch (fork mã nguồn mở): https://docs.opensearch.org
+- 📄 Meilisearch: https://www.meilisearch.com/docs · Typesense: https://typesense.org/docs/
+- 📄 *Designing Data-Intensive Applications*, chương 3 (phần về index) và chương 11 (đồng bộ dữ liệu giữa các hệ thống)
+- 🎬 https://www.youtube.com/results?search_query=elasticsearch+inverted+index+explained
+- 🏋️ Bài tập:
+  1. Chạy Meilisearch hoặc OpenSearch bằng Docker, index 100k sự kiện từ bài 9.2, so sánh chất lượng kết quả với Postgres full-text search.
+  2. Với OpenSearch/Elasticsearch: tạo analyzer có `asciifolding` (hoặc ICU) để tìm không dấu.
+  3. Đồng bộ qua outbox: sửa tên sự kiện → event `EventUpdated` → worker cập nhật index. Tắt worker 1 phút, sửa vài sự kiện, bật lại và kiểm tra index đuổi kịp.
+  4. Viết lệnh reindex toàn bộ không downtime (index mới + alias).
+- 🎫 Search sự kiện có facet theo thành phố, khoảng giá; Postgres vẫn là nguồn dữ liệu chính.
+
+### Module B — MongoDB cho Notification Service (trong Phase 7) — 🟢 Biết → 🟡 Dùng được
+- 📄 MongoDB manual: https://www.mongodb.com/docs/manual/
+- 📄 Data modeling (embed hay reference): https://www.mongodb.com/docs/manual/data-modeling/
+- 📄 MikroORM với MongoDB: https://mikro-orm.io/docs/usage-with-mongo · Mongoose: https://mongoosejs.com/docs/
+- 🎬 https://www.youtube.com/results?search_query=mongodb+schema+design+best+practices
+- 🏋️ Bài tập:
+  1. Thiết kế collection `notifications` (kênh, trạng thái, số lần retry, payload) và `templates`. Quyết định embed hay reference và giải thích.
+  2. Tạo index cho truy vấn "50 thông báo mới nhất của user X". Kiểm tra bằng `explain()`.
+  3. Viết ADR-007: vì sao Notification Service dùng MongoDB còn Ordering dùng Postgres.
+- 🎫 Notification Service của TicketHub.
+
+### Module C — AWS ngoài S3 (sau Phase 8) — 🟢 Biết
+- 📄 LocalStack (giả lập AWS ở local): https://docs.localstack.cloud
+- 📄 SQS: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html
+- 📄 Secrets Manager: https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html
+- 🏋️ Bài tập:
+  1. Chạy LocalStack, chuyển queue gửi email từ BullMQ sang SQS (dùng AWS SDK v3). So sánh: retry, delay, dead-letter queue, cách giám sát.
+  2. Đưa secret (DB password, JWT secret) vào Secrets Manager hoặc SSM Parameter Store thay cho file `.env` trên server.
+- 🎫 Ghi kết quả so sánh BullMQ và SQS vào ADR.
 
 ---
 
@@ -733,6 +854,8 @@ Học theo thứ tự: Strategy → Factory Method → Adapter → Decorator →
 | Microservices patterns | https://microservices.io/patterns/ |
 | Kiến trúc (Microsoft) | https://learn.microsoft.com/en-us/azure/architecture/patterns/ |
 | Bảo mật | https://cheatsheetseries.owasp.org |
+| Observability | https://opentelemetry.io/docs/ · https://grafana.com/docs/ |
+| AWS | https://docs.aws.amazon.com |
 | Sách nền tảng | *Designing Data-Intensive Applications* · *Refactoring* · *DDD Distilled* · *Building Microservices* |
 
 > Gặp link hỏng thì tìm theo tên bài hoặc tên mục trên trang chủ của docs đó (docs hay đổi đường dẫn khi lên phiên bản mới), và báo mentor để cập nhật file này.
