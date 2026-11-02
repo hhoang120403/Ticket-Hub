@@ -1,5 +1,5 @@
 # 🎯 Roadmap: Junior → Middle Fullstack Engineer
-### Stack: Next.js (React) · NestJS · MikroORM · PostgreSQL · Redis
+### Stack: Next.js (React) · NestJS · MikroORM · PostgreSQL · Redis · S3-compatible storage (RustFS → AWS S3)
 ### Học qua MỘT dự án thực tế duy nhất: **TicketHub** – nền tảng bán vé sự kiện
 
 > Viết bởi "mentor" cho mentee. Đọc hết phần 0–3 trước khi code dòng nào.
@@ -21,6 +21,8 @@
 9. [Lịch học hằng tuần & cách tự review](#9-lịch-học-hằng-tuần)
 10. [Checklist tự đánh giá "đã lên Middle chưa"](#10-checklist-tự-đánh-giá)
 11. [Tài liệu tham khảo](#11-tài-liệu-tham-khảo)
+12. [Sẵn sàng đi xin việc](#12-sẵn-sàng-đi-xin-việc)
+13. [Module tùy chọn](#13-module-tùy-chọn)
 
 ---
 
@@ -77,6 +79,7 @@ So với todo-app hay blog, bài toán bán vé có đủ "độ khó thật":
 - Staff quét QR check-in
 - Dashboard Organizer: doanh thu, số vé bán theo ngày
 - Mã giảm giá (coupon) – nơi thực hành Strategy/Specification pattern
+- Tìm kiếm sự kiện không dấu, chịu lỗi chính tả ("nhac rock ha noi" ra "Đêm nhạc Rock Hà Nội")
 
 **Phân tán (Phase 7)**
 - Tách Notification Service, Payment Service
@@ -110,6 +113,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - **Git:** branch, rebase vs merge, interactive rebase, conventional commits, giải quyết conflict
 - **SQL & PostgreSQL:** JOIN, GROUP BY, index (B-tree), `EXPLAIN ANALYZE`, transaction, isolation levels, `SELECT ... FOR UPDATE`
 - **Docker:** image, container, volume, network, docker compose
+- **SQL vs NoSQL:** khi nào chọn cái nào; cột `jsonb` của Postgres cho dữ liệu không cố định schema; Redis chính là một NoSQL kiểu key-value
 
 ### 3.2 Backend – NestJS
 - Module, Controller, Provider, Dependency Injection, scope (singleton/request)
@@ -131,7 +135,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - `Ref<T>` / `Reference`, lazy loading, `populate`, tránh N+1
 - `@Embeddable` cho Value Object (ví dụ `Money`, `Address`)
 - Migrations (`mikro-orm migration:create/up/down`), Seeder
-- Transaction: `em.transactional()`, `@Transactional()` decorator (v6)
+- Transaction: `em.transactional()`, `@Transactional()` decorator (có từ v6; hiện MikroORM đã có v7, luôn đọc docs đúng phiên bản bạn cài)
 - **Optimistic locking:** `@Property({ version: true })` + `OptimisticLockError`
 - **Pessimistic locking:** `em.findOne(..., { lockMode: LockMode.PESSIMISTIC_WRITE })`
 - Filters (soft delete, multi-tenant), lifecycle hooks / event subscribers
@@ -162,8 +166,27 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - Dockerfile multi-stage, docker compose cho dev
 - CI/CD với GitHub Actions (lint → test → build → deploy)
 - Deploy lên VPS (Nginx reverse proxy + SSL) hoặc Railway/Fly.io/Render
-- Observability: structured log, health check, Sentry, OpenTelemetry tracing, Prometheus + Grafana (cơ bản)
+- Observability: structured log có redact, health check (liveness/readiness), Sentry, OpenTelemetry tracing, Prometheus + Grafana, Loki, alert, metric nghiệp vụ
+- Object storage S3-compatible: RustFS ở local, AWS S3 khi lên cloud, presigned URL, CORS bucket
 - Bảo mật: OWASP Top 10, rate limit, helmet, secret management
+
+### 3.7 Quyết định công nghệ phụ trợ (đã chốt)
+
+| Nhu cầu | Dùng gì | Đưa vào ở | Vì sao |
+|---|---|---|---|
+| Database chính | **PostgreSQL** | Phase 0 | Dữ liệu quan hệ rõ, bài toán chống overselling cần transaction và lock |
+| NoSQL | **Redis** (cache, seat hold, queue) · `jsonb` của Postgres · MongoDB tùy chọn | Phase 5, 7 | Không dùng NoSQL làm DB chính. MongoDB chỉ ở Notification Service, nơi có lý do thật (xem mục 13) |
+| Object storage | **RustFS** ở local → **AWS S3** khi deploy | Phase 3, 8 | Cùng S3 API: code bằng AWS SDK v3, chỉ đổi biến môi trường. MinIO Community Edition đã vào chế độ bảo trì từ 12/2025 nên không chọn |
+| Log | **Pino** (`nestjs-pino`), log JSON có `traceId`, `redact` dữ liệu nhạy cảm | Phase 1 | Nhanh, chuẩn trong hệ Node |
+| Gom log | **Loki** + Grafana | Phase 8 | Nhẹ hơn ELK rất nhiều, chạy được trên VPS nhỏ |
+| Error tracking | **Sentry** (FE + BE) | Mốc MVP (cuối Phase 3) | Có gói miễn phí, thấy lỗi thật của người dùng ngay khi deploy |
+| Metrics | **Prometheus** + **Grafana** (`prom-client`) | Phase 5 (local), Phase 8 (prod) | 4 golden signals, metric BullMQ, metric nghiệp vụ |
+| Tracing | **OpenTelemetry** → **Tempo** hoặc Jaeger | Phase 5, mở rộng ở Phase 7 | Trace xuyên API → queue → worker, sau đó xuyên các service |
+| Môi trường observability local | Image **`grafana/otel-lgtm`** (Grafana, Loki, Tempo, Prometheus, OTel collector trong một container) | Phase 5 | Một dòng trong docker compose là có đủ bộ để học |
+| Uptime | **Uptime Kuma** (tự host) hoặc Better Stack | Phase 8 | Ping `/health`, báo qua Telegram/email |
+| Search | **PostgreSQL full-text search** + `unaccent` + `pg_trgm` | Phase 1 (bản `ILIKE`), Phase 9 (bản đầy đủ) | Đủ cho vài trăm nghìn sự kiện, không phải vận hành thêm hệ thống. Elasticsearch/OpenSearch là module tùy chọn |
+
+**Không dùng (chỉ cần biết tên):** ELK/OpenSearch để lưu log (quá nặng cho VPS), Datadog/New Relic (tốt nhưng tốn tiền), Kubernetes (Docker Compose là đủ).
 
 ---
 
@@ -182,12 +205,12 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - TypeScript nâng cao (generics, utility types, discriminated union, decorators)
 - pnpm workspaces + Turborepo
 - ESLint (flat config), Prettier, Husky + lint-staged, commitlint (Conventional Commits)
-- Docker compose: PostgreSQL, Redis, pgAdmin/Adminer, Mailpit (bắt email local)
+- Docker compose: PostgreSQL, Redis, pgAdmin/Adminer, Mailpit (bắt email local), RustFS (S3-compatible storage)
 
 🛠 Việc
 - [ ] Tạo repo GitHub `tickethub`, bảo vệ nhánh `main` (bắt buộc PR)
 - [ ] Monorepo: `apps/web` (Next.js), `apps/api` (NestJS), `packages/shared` (types, zod schemas), `packages/eslint-config`, `packages/tsconfig`
-- [ ] `docker-compose.yml` cho Postgres, Redis, Mailpit
+- [ ] `docker-compose.yml` cho Postgres, Redis, Mailpit, RustFS (tạo sẵn bucket `tickethub-media`)
 - [ ] `.env.example`, README hướng dẫn chạy
 - [ ] Vẽ ERD (mục 2.3) và viết **ADR-001: Chọn monorepo**, **ADR-002: Chọn MikroORM**
 - [ ] Tạo GitHub Project (Kanban) với issues cho Phase 1
@@ -214,8 +237,8 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 🛠 Việc
 - **Tuần 3:** Setup `MikroOrmModule.forRootAsync` + config validate env; entity `User`, `Organization`, `Event`; migration đầu tiên; seeder dữ liệu mẫu
 - **Tuần 4:** Module `events`: Controller → Service → Repository (custom `EntityRepository`); DTO + validation; Swagger
-- **Tuần 5:** `TicketType` với Value Object `Money` (`@Embeddable`: `amount` lưu số nguyên theo đơn vị nhỏ nhất, `currency`); tìm kiếm/lọc/phân trang sự kiện; slug unique
-- **Tuần 6:** Global `ExceptionFilter` chuẩn hóa lỗi; `LoggingInterceptor` + correlation id (pino); `TransformInterceptor`; health check (`@nestjs/terminus`)
+- **Tuần 5:** `TicketType` với Value Object `Money` (`@Embeddable`: `amount` lưu số nguyên theo đơn vị nhỏ nhất, `currency`); tìm kiếm/lọc/phân trang sự kiện (bản đầu dùng `ILIKE`, Phase 9 nâng cấp); slug unique
+- **Tuần 6:** Global `ExceptionFilter` chuẩn hóa lỗi; logging bằng `nestjs-pino` (log JSON, correlation id, `redact` các field `password`, `token`, `authorization`, `cookie`); `TransformInterceptor`; health check (`@nestjs/terminus`) tách `/health/live` và `/health/ready` (ready kiểm tra DB, Redis)
 - Bonus: Soft delete bằng MikroORM Filter
 
 ✅ DoD
@@ -223,6 +246,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - Không có N+1 query (bật `debug: true` và kiểm tra log SQL)
 - Migration chạy được từ DB trống
 - Lỗi trả về format thống nhất: `{ statusCode, code, message, details?, traceId }`
+- Log là JSON, mỗi dòng có `traceId`; gửi thử request login và kiểm tra log **không** chứa mật khẩu hay token
 
 ❓ Tự kiểm tra
 - `em.persist()` có ghi xuống DB ngay không? `flush()` làm gì?
@@ -275,7 +299,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 🛠 Việc
 - **Tuần 9:** Layout, design tokens, component library cơ bản (Button, Input, Card, Dialog); trang danh sách sự kiện (RSC, phân trang, filter qua search params)
 - **Tuần 10:** Trang chi tiết sự kiện (ISR + `generateMetadata`); auth pages; middleware bảo vệ route; tự động refresh token
-- **Tuần 11:** Dashboard Organizer: CRUD sự kiện, form nhiều bước, upload ảnh (presigned URL tới S3/MinIO)
+- **Tuần 11:** Dashboard Organizer: CRUD sự kiện, form nhiều bước, upload ảnh bằng presigned URL tới RustFS. Code bằng AWS SDK v3 (`@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`); `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`, `S3_PUBLIC_ENDPOINT` lấy từ env để sau này đổi sang AWS S3 không phải sửa code. Cấu hình CORS cho bucket
 - **Tuần 12:** Luồng mua vé (giỏ hàng bằng Zustand → checkout → "Vé của tôi"); loading/error/empty states; tạo **API client có type** (generate từ OpenAPI bằng `openapi-typescript` hoặc dùng chung types từ `packages/shared`)
 
 ✅ DoD
@@ -289,7 +313,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - Khi nào cần TanStack Query nếu đã có RSC fetch?
 - Hydration error đến từ đâu?
 
-> 🏁 **Mốc 1 (~3 tháng):** MVP chạy end-to-end. Deploy thử bản đầu (xem Phase 8 phần deploy tối thiểu). Viết bài blog/README tổng kết.
+> 🏁 **Mốc 1 (~3 tháng):** MVP chạy end-to-end. **Gắn Sentry cho cả Next.js và NestJS trước khi deploy**, rồi deploy thử bản đầu (xem Phase 8 phần deploy tối thiểu). Viết bài blog/README tổng kết. Đây cũng là lúc **có thể bắt đầu nộp đơn Junior** (xem mục 12).
 
 ---
 
@@ -312,6 +336,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - [ ] Module giao tiếp qua **public interface** hoặc domain event (`@nestjs/event-emitter`), **cấm import entity của module khác**
 - [ ] Coupon bằng **Strategy** (PercentDiscount, FixedDiscount) + **Specification** (còn hạn, còn lượt, đúng sự kiện)
 - [ ] Payment provider bằng **Adapter** + **Factory** (`MockPaymentAdapter`, `StripeAdapter`)
+- [ ] Storage sau một port `FileStorage` (`getUploadUrl`, `getDownloadUrl`, `delete`) với adapter `S3FileStorage`. Use case không biết đang chạy RustFS hay AWS
 - [ ] Rule ESLint `import/no-restricted-paths` hoặc `dependency-cruiser` để chặn vi phạm ranh giới module
 - [ ] **ADR-004: Modular monolith thay vì microservices ngay**
 
@@ -338,6 +363,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - **Idempotency key**, **Transactional Outbox**
 - Webhook: verify chữ ký, xử lý trùng lặp, thứ tự không đảm bảo
 - WebSocket (Socket.IO), Redis adapter khi chạy nhiều instance
+- Observability cho hệ bất đồng bộ: OpenTelemetry tracing xuyên API → queue → worker, metric BullMQ, metric nghiệp vụ
 
 🛠 Việc
 - **Tuần 16 – Chống overselling:**
@@ -356,8 +382,12 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
   - Gateway WebSocket: phòng theo `eventId`, phát sự kiện số vé còn lại/ghế được giữ
   - FE cập nhật realtime; Staff check-in bằng quét QR (camera trên web)
   - Caching: Redis cache cho trang danh sách sự kiện + chiến lược invalidate
+- **Xuyên suốt Phase 5 – Observability:**
+  - Thêm `grafana/otel-lgtm` vào docker compose; gắn OpenTelemetry SDK cho API và worker, xem được một trace từ `POST /orders` tới job gửi email
+  - Expose `/metrics` (`prom-client`): latency, error rate, độ dài queue, số job failed
+  - Metric nghiệp vụ: `tickets_sold_total`, `orders_expired_total`, `optimistic_lock_conflicts_total`, `webhook_duplicates_total`, `outbox_pending` (tuổi của message cũ nhất), và **`tickets_oversold_total` luôn phải bằng 0**
 
-✅ DoD: Load test 1000 request đồng thời → số vé bán **không bao giờ** vượt quantity; webhook gửi lặp 5 lần → chỉ 1 lần xử lý; tắt worker rồi bật lại → không mất email.
+✅ DoD: Load test 1000 request đồng thời → số vé bán **không bao giờ** vượt quantity; webhook gửi lặp 5 lần → chỉ 1 lần xử lý; tắt worker rồi bật lại → không mất email; mở Grafana thấy được trace của một lần mua vé và dashboard metric nghiệp vụ.
 
 ❓ Tự kiểm tra
 - Vì sao "kiểm tra còn vé rồi mới trừ" trong code lại sai khi có concurrency?
@@ -408,12 +438,13 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - API Gateway (NestJS gateway tự viết, hoặc Kong/Traefik)
 - **Saga:** choreography vs orchestration; compensating transaction
 - Database per service, eventual consistency, duplicate data có chủ đích
+- SQL vs NoSQL khi mỗi service tự chọn database (MongoDB cho Notification Service là tùy chọn, xem mục 13)
 - Distributed tracing: **OpenTelemetry** + Jaeger/Tempo
 - Service-to-service auth, timeout, retry, circuit breaker
 - Contract testing (Pact) – mức tìm hiểu
 
 🛠 Việc (Strangler Fig pattern – tách từng phần)
-- **Tuần 22:** Tách **Notification Service** (dễ nhất, chỉ nhận event): consume `OrderPaid` → gửi email; DB riêng hoặc không DB
+- **Tuần 22:** Tách **Notification Service** (dễ nhất, chỉ nhận event): consume `OrderPaid` → gửi email; DB riêng để lưu lịch sử gửi và template (Postgres, hoặc MongoDB nếu làm module tùy chọn)
 - **Tuần 23:** Tách **Payment Service**: sở hữu bảng Payment, nhận webhook, phát `PaymentSucceeded`/`PaymentFailed`
 - **Tuần 24:** **Saga đặt vé** (orchestration trong Ordering): `OrderCreated` → reserve tickets → request payment → success: confirm & phát hành vé / fail: release tickets & cancel order. Vẽ sequence diagram.
 - **Tuần 25:** API Gateway: route request, xác thực JWT tập trung, rate limit; FE chỉ gọi gateway
@@ -439,7 +470,8 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - Deploy: VPS (Ubuntu + Docker Compose + Nginx + Let's Encrypt) **hoặc** PaaS (Railway/Fly.io/Render) + Vercel cho Next.js
 - Chạy migration an toàn khi deploy (expand–contract cho thay đổi schema)
 - Quản lý secrets, môi trường staging vs production
-- Observability: structured logs (Loki hoặc dịch vụ log), metrics (Prometheus + Grafana), error tracking (Sentry), uptime monitor
+- Observability trên production: Loki (log), Prometheus (metric), Tempo (trace), Grafana (dashboard + alert), Sentry (lỗi), Uptime Kuma (uptime). Thời gian lưu log, mức log theo môi trường
+- AWS cơ bản: IAM user/role với quyền tối thiểu, S3 (bucket policy, CORS), biết RDS là gì và khi nào nên dùng thay vì tự chạy Postgres
 - Backup Postgres định kỳ và **thử restore**
 - (Tìm hiểu) Kubernetes cơ bản: Pod, Deployment, Service, Ingress
 
@@ -447,8 +479,11 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 - [ ] Dockerfile cho từng app; `docker-compose.prod.yml`
 - [ ] Pipeline: PR → lint, typecheck, test; merge `main` → build image → deploy staging; tag → production
 - [ ] Domain thật + HTTPS
-- [ ] Sentry FE + BE; dashboard Grafana: request rate, error rate, latency p95, queue length
-- [ ] Alert khi error rate tăng hoặc queue ứ đọng
+- [ ] Chuyển storage sang **AWS S3** (free tier): tạo bucket, IAM user chỉ có quyền trên bucket đó, CORS; đổi biến môi trường, **không sửa code**
+- [ ] (Tùy chọn) Chuyển DB sang AWS RDS, hoặc viết ADR giải thích vì sao vẫn tự chạy Postgres
+- [ ] Dựng Loki + Prometheus + Tempo + Grafana trên server (hoặc dùng gói miễn phí của Grafana Cloud); dashboard: request rate, error rate, latency p95, queue length, metric nghiệp vụ từ Phase 5
+- [ ] Alert: error rate > 5%, latency p95 > 1s, queue tồn > 1000 job, có job vào dead-letter, `tickets_oversold_total` > 0, outbox ứ đọng quá 5 phút
+- [ ] Uptime Kuma ping `/health/ready` mỗi phút, báo qua Telegram hoặc email
 - [ ] Runbook: "Làm gì khi payment webhook lỗi", "Rollback deploy thế nào"
 
 ✅ DoD: Push code → lên staging tự động trong < 15 phút; có thể rollback trong 5 phút; nhìn dashboard biết hệ thống khỏe hay không.
@@ -461,6 +496,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 
 🛠 Việc
 - [ ] Performance BE: phân tích `EXPLAIN ANALYZE`, thêm index đúng chỗ, cursor pagination, tránh over-fetch
+- [ ] Search sự kiện bằng PostgreSQL full-text search: cột `tsvector` (generated column) + GIN index, `unaccent` để tìm không dấu, `pg_trgm` để chịu lỗi chính tả; so sánh tốc độ với bản `ILIKE` bằng `EXPLAIN ANALYZE`
 - [ ] Performance FE: bundle analyzer, lazy load, giảm client components, Core Web Vitals
 - [ ] Dashboard Organizer: báo cáo doanh thu (thử **CQRS**: read model riêng/materialized view)
 - [ ] Viết tài liệu kiến trúc: C4 diagram (Context, Container, Component), sequence diagram luồng đặt vé
@@ -520,7 +556,7 @@ OutboxMessage (id, type, payload, createdAt, processedAt)   -- Phase 5
 | **Strategy** | Cách tính giảm giá của Coupon; chiến lược gửi thông báo (email/SMS) | 4 |
 | **Specification** | Điều kiện áp dụng coupon, điều kiện được hoàn tiền | 4 |
 | **Factory** | Tạo payment adapter theo provider; tạo Ticket + mã QR | 4 |
-| **Adapter** | Bọc Stripe/VNPay, bọc dịch vụ email | 4 |
+| **Adapter** | Bọc Stripe/VNPay, bọc dịch vụ email, `FileStorage` → `S3FileStorage` (RustFS/AWS) | 4 |
 | **State** | Vòng đời `Order` (PENDING → PAID → REFUNDED…) | 4 |
 | **Observer / Domain Events** | `OrderPaid` → phát hành vé, gửi email | 4–5 |
 | **Facade** | Module public API giữa các bounded context | 4 |
@@ -558,7 +594,8 @@ tickethub/
 ├── infra/
 │   ├── docker/
 │   ├── nginx/
-│   └── grafana/
+│   ├── rustfs/                 # script tạo bucket, cấu hình CORS
+│   └── observability/          # cấu hình Grafana, Prometheus, Loki, alert rules
 ├── docs/
 │   ├── adr/
 │   ├── diagrams/
@@ -575,6 +612,7 @@ apps/api/src/
 ├── app.module.ts
 ├── config/                     # env schema, mikro-orm.config.ts
 ├── common/                     # filters, interceptors, guards, decorators dùng chung
+│   └── storage/                # port FileStorage + adapter S3FileStorage (Phase 4)
 ├── database/
 │   ├── migrations/
 │   └── seeders/
@@ -734,11 +772,14 @@ Gợi ý cho 12–15 giờ/tuần:
 - [ ] Tự viết Dockerfile, CI/CD
 - [ ] Deploy được, rollback được
 - [ ] Có log, metric, tracing, alert; biết đọc chúng khi có sự cố
+- [ ] Có metric nghiệp vụ và giải thích được vì sao từng metric quan trọng
+- [ ] Đổi storage từ RustFS sang AWS S3 chỉ bằng biến môi trường
+- [ ] Trả lời được "SQL hay NoSQL, vì sao" bằng ví dụ trong TicketHub
 
 **Kỹ năng mềm**
 - [ ] Tự chia một feature lớn thành task nhỏ và ước lượng
 - [ ] Viết PR description và tài liệu rõ ràng
-- [ ] Trình bày dự án trong 5 phút, đi sâu 1 tiếng
+- [ ] Trình bày dự án trong 5 phút, đi sâu 1 tiếng (cả bằng tiếng Việt lẫn tiếng Anh)
 
 ---
 
@@ -752,6 +793,10 @@ Gợi ý cho 12–15 giờ/tuần:
 - TanStack Query: https://tanstack.com/query
 - BullMQ: https://docs.bullmq.io
 - PostgreSQL: https://www.postgresql.org/docs
+- RustFS: https://docs.rustfs.com
+- AWS SDK for JavaScript v3 (S3): https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/
+- OpenTelemetry JS: https://opentelemetry.io/docs/languages/js/
+- Grafana (Loki, Tempo, Prometheus): https://grafana.com/docs/
 
 **Sách**
 - *Clean Code* – Robert C. Martin (đọc có chọn lọc)
@@ -769,6 +814,72 @@ Gợi ý cho 12–15 giờ/tuần:
 
 **Repo tham khảo** (đọc để học cấu trúc, đừng copy)
 - Tìm trên GitHub: `nestjs clean architecture`, `nestjs ddd`, `mikro-orm realworld example`, `nextjs app router saas starter`
+
+---
+
+## 12. Sẵn sàng đi xin việc
+
+> Dựa trên các JD Fullstack (NestJS/Next.js/Node/React) trên ITviec, tháng 11/2026. Thị trường thay đổi nhanh: trước khi nộp, hãy đọc lại 10–20 JD mới nhất và cập nhật mục này.
+
+### 12.1 JD thường yêu cầu gì
+
+| Yêu cầu hay gặp | TicketHub | Ghi chú |
+|---|---|---|
+| NestJS, React/Next.js, TypeScript | ✅ Phase 1–3 | Khớp gần như hoàn toàn |
+| SQL (PostgreSQL/MySQL) | ✅ Sâu: index, transaction, lock | Vượt mức Junior |
+| REST API, WebSocket | ✅ Phase 1, 5 | |
+| Design pattern, kiến trúc | ✅ Phase 4 | |
+| Docker, CI/CD | ✅ Phase 8 | |
+| Testing (Jest, Cypress/Playwright) | ✅ Phase 6 | |
+| Microservices (điểm cộng) | ✅ Phase 7 | |
+| NoSQL (MongoDB) | ⚠️ Redis + module tùy chọn MongoDB | Xuất hiện ở nhiều JD |
+| Cloud AWS/GCP (S3, RDS, Lambda, SQS) | ⚠️ S3 thật ở Phase 8, phần còn lại là module tùy chọn | JD Middle gần như luôn có |
+| Tiếng Anh | ❌ Ngoài phạm vi code | Có trong hầu hết JD |
+| Số năm kinh nghiệm | ❌ Dự án cá nhân không thay được | Junior thường 1–2 năm, Middle 2–3+ năm |
+
+### 12.2 Khi nào nộp đơn
+
+- **Sau Mốc 1 (cuối Phase 3, MVP đã deploy, có Sentry):** nộp các vị trí **Junior / Fresher+**.
+- **Sau Phase 5 (chống overselling, queue, outbox, có observability):** nộp **Junior+ hoặc Junior/Middle**. Đây là phần làm bạn nổi bật hẳn so với ứng viên cùng cấp.
+- **Không đợi xong Phase 9.** Vừa đi làm vừa hoàn thiện TicketHub là bình thường. Kinh nghiệm làm việc thật cộng với dự án sâu là con đường nhanh nhất lên Middle.
+- Với vị trí "đầu Middle" khi chưa có năm kinh nghiệm nào: TicketHub đủ để qua vòng phỏng vấn kỹ thuật, nhưng nhiều nơi lọc CV theo số năm. Hãy nhắm các JD ghi "Junior/Middle" và dùng dự án để đàm phán mức lương cao hơn.
+
+### 12.3 Bù các khoảng trống
+
+- **Tiếng Anh (ít tốn công, tác động lớn):** viết README, ADR, commit message và PR description bằng tiếng Anh từ Phase 0. Luyện trình bày TicketHub trong 5 phút bằng tiếng Anh.
+- **AWS:** S3 thật ở Phase 8; nếu còn thời gian làm Module C (mục 13).
+- **NoSQL:** chuẩn bị câu trả lời "SQL hay NoSQL" bằng ví dụ thật: Postgres cho đơn hàng vì cần transaction, Redis cho seat hold vì cần TTL, MongoDB (nếu làm Module B) cho lịch sử thông báo.
+- **Dùng AI khi code:** nhiều nơi hỏi bạn dùng AI thế nào. Kể quy trình học với AI mentor (AGENTS.md): AI gợi ý và review, bạn tự quyết định và tự viết.
+
+### 12.4 CV và cách kể dự án
+
+- CV một trang. Mục dự án ghi **bài toán và kết quả đo được**, không liệt kê công nghệ suông. Ví dụ: "Chống bán vượt vé khi 1000 request đồng thời: so sánh 3 chiến lược lock, chọn atomic conditional UPDATE (ADR-005), p95 giảm từ X ms xuống Y ms".
+- Link GitHub (README tốt, có sơ đồ kiến trúc, link ADR) và link demo đang chạy.
+- Chuẩn bị 3 câu chuyện kỹ thuật kể được trong 2–3 phút mỗi câu: chống overselling, outbox và idempotency, một lần debug khó nhờ log/trace.
+- Gõ `phỏng vấn thử` với AI mentor trước mỗi buổi phỏng vấn thật.
+
+---
+
+## 13. Module tùy chọn
+
+Làm khi đã xong phase tương ứng và còn thời gian. Không bắt buộc để đạt mục tiêu của roadmap.
+
+### Module A — Search engine riêng (sau Phase 5, ưu tiên sau Phase 9)
+- **Khi nào cần:** Postgres full-text search (Phase 9) không còn đáp ứng: cần xếp hạng độ liên quan tốt hơn, facet (đếm kết quả theo bộ lọc), autocomplete, dữ liệu rất lớn.
+- **Chọn gì:** Elasticsearch hoặc OpenSearch (mạnh, hay có trong JD, nhưng nặng) hoặc Meilisearch/Typesense (nhẹ, chịu lỗi chính tả tốt ngay từ đầu).
+- **Bài học chính là đồng bộ dữ liệu:** domain event `EventPublished`/`EventUpdated` → outbox → worker cập nhật index; xử lý eventual consistency, reindex toàn bộ, phát hiện index lệch so với DB. Search index **không bao giờ** là nguồn dữ liệu chính.
+- Khái niệm cần nắm: inverted index, analyzer (tiếng Việt cần bỏ dấu bằng `asciifolding` hoặc ICU), mapping, relevance score.
+- ✅ DoD: tìm "nhac rock ha noi" ra đúng sự kiện; sửa tên sự kiện thì sau vài giây kết quả search cập nhật; có lệnh reindex.
+
+### Module B — MongoDB cho Notification Service (trong Phase 7)
+- Lưu lịch sử thông báo đã gửi (kênh, trạng thái, số lần retry, payload) và template email: dữ liệu dạng document, ghi nhiều, ít quan hệ.
+- Dùng Mongoose hoặc MikroORM (MikroORM có driver MongoDB). Thiết kế index cho truy vấn "lịch sử thông báo của user X".
+- Viết **ADR-007: Vì sao Notification Service dùng MongoDB còn Ordering dùng Postgres**.
+
+### Module C — AWS ngoài S3 (sau Phase 8)
+- **LocalStack** để giả lập AWS ở local; thử SQS thay cho một queue BullMQ (ví dụ queue gửi email) và so sánh.
+- RDS cho Postgres; Secrets Manager hoặc SSM Parameter Store cho secret.
+- Ghi chú chi phí: luôn đặt budget alert trên AWS trước khi tạo tài nguyên.
 
 ---
 

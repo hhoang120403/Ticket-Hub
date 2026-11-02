@@ -17,16 +17,17 @@ Bắt đầu: 2026-10-27
 - [ ] 0.2 TypeScript cơ bản → nâng cao 🔴 — 🏋️ type-challenges, `ApiResponse<T>`, `MyPick/MyOmit/...`, `@LogExecutionTime()`
 - [ ] 0.3 HTTP & REST 🟡 — 🏋️ `curl -v`, server `node:http` + CORS
 - [ ] 0.4 Git chuẩn team 🟡 — 🏋️ learngitbranching, conflict merge/rebase, `rebase -i`
-- [ ] 0.5 Docker & Compose 🟡 — 🏋️ Postgres có/không volume, compose Postgres + Redis + Adminer
-- [ ] 0.6 SQL & PostgreSQL cơ bản 🟡 — 🏋️ 10 query, `EXPLAIN ANALYZE` trước/sau index
+- [ ] 0.5 Docker & Compose 🟡 — 🏋️ Postgres có/không volume, compose Postgres + Redis + Adminer, thêm RustFS (tạo bucket, upload thử)
+- [ ] 0.6 SQL & PostgreSQL cơ bản 🟡 — 🏋️ 10 query, `EXPLAIN ANALYZE` trước/sau index, cột `jsonb` (`->`, `->>`, `@>`)
 - [ ] 0.7 Monorepo & công cụ chất lượng code 🟡 — 🏋️ monorepo thử `apps/a`, `apps/b`, `packages/utils`
 - [ ] 0.8 ERD 🟡 — 🏋️ ERD thư viện sách
+- [ ] 0.9 SQL vs NoSQL 🟢 — 🏋️ bảng so sánh 4 nhóm NoSQL + dữ liệu nào của TicketHub hợp Postgres/Redis
 
 ### Việc trong TicketHub (roadmap — Phase 0)
-- [ ] Repo GitHub `tickethub`, bảo vệ nhánh `main` (bắt buộc PR)
+- [x] Repo GitHub `Ticket-Hub`, bảo vệ nhánh `main` (bắt buộc PR), `.gitignore` qua PR #1
 - [ ] Monorepo: `apps/web`, `apps/api`, `packages/shared`, `packages/eslint-config`, `packages/tsconfig`
 - [ ] ESLint (flat config), Prettier, Husky + lint-staged, commitlint
-- [ ] `docker-compose.yml`: Postgres, Redis, Mailpit (+ Adminer)
+- [ ] `docker-compose.yml`: Postgres, Redis, Mailpit, RustFS (tạo sẵn bucket `tickethub-media`) (+ Adminer)
 - [ ] `.env.example` + README hướng dẫn chạy
 - [ ] ERD TicketHub (roadmap mục 2.3)
 - [ ] ADR-001: Chọn monorepo
@@ -38,6 +39,8 @@ Bắt đầu: 2026-10-27
 - [ ] `.env` nằm trong `.gitignore`, chỉ commit `.env.example`
 - [ ] `packages/shared` không import từ `apps/*`
 - [ ] ERD có đánh dấu unique + index
+- [ ] README, ADR, commit message viết bằng tiếng Anh
+- [ ] Access key của RustFS chỉ nằm trong `.env`, không hardcode trong `docker-compose.yml`
 
 ### Điều kiện qua phase
 - [ ] **DoD:** `pnpm install && docker compose up -d && pnpm dev` → web và api cùng chạy; commit sai format bị chặn.
